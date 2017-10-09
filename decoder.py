@@ -11,6 +11,8 @@ def decode(z, std_deviation):
   decode returns x, also a 7 value array: (x1, x2, x3, x4, x5, x6, x7)
 '''
 
+  # TODO: V, F need to contain two values for each entry!! 
+
   # variable to function node matrix (initialized to its content before the first iteration)
   V = numpy.copy(H)
 
@@ -36,14 +38,18 @@ def decode(z, std_deviation):
   for iteration in range(0, num_iterations):
     for row_idx, row in enumerate(F):
       for col_idx, col in enumerate(row):
-        #F[row_idx, col_idx]
-        msg = 1
-        #following two lines do the same as the loop below, just harder to understand
-        #msg = V[row_idx, np.arange(H.shape[1])!=col_idx]
-        #msg = H[row_idx, col_idx] * np.product(msg[msg!=0])
         # multiply the incoming messages together (ie the messages in the variable matrix from the upstream variables, so excluding the downstream variable)
+        # to do so select all column indices of V except the column index of the current var under consideration
+        # if there is no connection between the two nodes currently considered, output zero hence use of H matrix
+        msg = V[row_idx, np.arange(H.shape[1])!=col_idx]
+        msg = H[row_idx, col_idx] * np.product(msg[msg!=0])
+        
+        # 
+        F[row_idx, col_idx]
         for v_col_idx in range(0, len(row)):
           if v_col_idx != col_idx and H[v_col_idx, col_idx):
             msg *= V[v_col_idx, col_idx)
           
 
+# 1. pseudo-code for transmitter
+# 2. 

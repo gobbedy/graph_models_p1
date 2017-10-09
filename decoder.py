@@ -38,6 +38,10 @@ def decode(z, std_deviation):
       for col_idx, col in enumerate(row):
         #F[row_idx, col_idx]
         msg = 1
+        #following two lines do the same as the loop below, just harder to understand
+        #msg = V[row_idx, np.arange(H.shape[1])!=col_idx]
+        #msg = H[row_idx, col_idx] * np.product(msg[msg!=0])
+        # multiply the incoming messages together (ie the messages in the variable matrix from the upstream variables, so excluding the downstream variable)
         for v_col_idx in range(0, len(row)):
           if v_col_idx != col_idx and H[v_col_idx, col_idx):
             msg *= V[v_col_idx, col_idx)

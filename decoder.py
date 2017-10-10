@@ -66,7 +66,6 @@ def decode(z, std_deviation):
         F[row_idx, col_idx] = maxproduct(upstream_entries)  
 
     # fill up V
-    #for idx in np.ndenumerate(V): # row_idx=idx(0); col_idx=idx(1)
     for col_idx, col in enumerate(H.T):
       for row_idx, entry in enumerate(col):
         
@@ -138,7 +137,7 @@ def maxproduct(upstream_entries):
         
         # find the max message (m(1-a4) is the max of these 4 results)
         node_function[1 - upstream_entries_max_argmax_sum] = np.amax(products, 1)
-    
+
 
 def equi_count_generator(desired_parity):
 '''

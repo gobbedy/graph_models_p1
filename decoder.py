@@ -11,20 +11,18 @@ def decode(z, std_deviation):
   decode returns x, also a 7 value array: (x1, x2, x3, x4, x5, x6, x7)
 '''
 
-  # TODO: V, F need to contain two values for each entry!! 
-
   # variable to function node matrix (initialized to its content before the first iteration)
-  V = np.zeros((H.shape + (2,)))
+  V = np.ones((H.shape + (2,)))
 
   # function to variable node matrix (initialized to its content after the first iteration -- first iteration will be recomputed anyway)
-  F = np.zeros((H.shape + (2,)))
+  F = np.ones((H.shape + (2,)))
   
-  # set V and F to its initial values (all ones, except where H is 0)
+  # V and F have been set to their initial values (all ones) -- note that where H is zero, it will be set (and reset) to zero at every iteration.
   
 
   # compute the static node messages (not in cycles), ie the Pzi|xi -> xi nodes
-  # we store these in a 7 item value, m, where m(i-1) is Pzi|xi -> xi -- m(i-1) and not m(i) since zero based
-  # each m(i-1) is a 2 value array where m(i-1)(j) corresponds to x(i)=j
+  # we store these in a 7 entry, m, where m(i-1) is Pzi|xi -> xi -- m(i-1) and not m(i) since zero based
+  # each m(i-1) is a 2 entry array where m(i-1)(j) corresponds to x(i)=j
   m = np.zeros((len(sz), 2))
   for idx, zi in enumerate(z):
     # x(i) = 0 is transmitted as -1 so gaussian curve has mean -1
@@ -42,7 +40,13 @@ def decode(z, std_deviation):
     # fill up F
     #for idx in np.ndenumerate(V): # row_idx=idx(0); col_idx=idx(1)
     for row_idx, row in enumerate(H):
-      for col_idx, col in enumerate(row):
+      for col_idx, entry in enumerate(row):
+        
+        # if H entry is zero, these two nodes are not connected      
+        if entry == 0:
+          F[row_idx, col_idx] = [0, 0]
+          continue
+
         # multiply the incoming messages together (ie the messages in the variable matrix from the upstream variables, so excluding the downstream variable)
         # to do so select all column indices of V except the column index of the current var under consideration
         # if there is no connection between the two nodes currently considered, output zero hence use of H matrix
@@ -54,12 +58,41 @@ def decode(z, std_deviation):
         upstream_entries_col_indices = np.where(upstream_entries_col_indices_bool) # find the indices of the "True" values
         upstream_entries = V[row_idx, upstream_entries_col_indices] # extract the entries from V -- 3x2 matrix
 
-        # TODO: sum product
-        # TODO: variable node
+        # TODO: debug
+        # TODO: sum product (note that variable loop will remain the same, only the maxproduct line changes)
+        # TODO: deal with underflow/overflow (?)
+        
+        # compute the message passed from this function node to the downstream variable -- ie the max product of the upstream variables and the current node's function
+        F[row_idx, col_idx] = maxproduct(upstream_entries)  
 
+    # fill up V
+    #for idx in np.ndenumerate(V): # row_idx=idx(0); col_idx=idx(1)
+    for col_idx, col in enumerate(H.T):
+      for row_idx, entry in enumerate(col):
+        
+        # if H entry is zero, these two nodes are not connected      
+        if entry == 0:
+          V[row_idx, col_idx] = [0, 0]
+          continue
+
+        # multiply the incoming messages together (ie the messages in the variable matrix from the upstream variables, so excluding the downstream variable)
+        # to do so select all column indices of F except the row index of the current function under consideration
+        # if there is no connection between the two nodes currently considered, output zero hence use of H matrix
+        
+        # get only the relevant entries of V, representing the upstream variables coming into the current node function
+        # (ie the current row, less all the zero entries of H, less the current column index)
+        upstream_entries_row_indices_bool = col(col!=0) # 1xn boolean array with True only where H is 1 (ie in up to 3 places, so n<=3)
+        upstream_entries_row_indices_bool[row_idx] = False # also remove the current row (down to 2 or less entries)
+        upstream_entries_row_indices = np.where(upstream_entries_row_indices_bool) # find the indices of the "True" values
+        upstream_entries = F[upstream_entries_row_indices, col_idx] # extract the entries from F -- cx2 matrix, where c is number of upstream function nodes 
+
+        # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle -- should just be set to m(i), make sure its not zero
 
         # compute the message passed from this function node to the downstream variable -- ie the max product of the upstream variables and the current node's function
-        F[row_idx, col_idx] = maxproduct(upstream_entries)          
+        V[row_idx, col_idx] = np.product(upstream_entries, 0) * m[col_idx]
+
+        # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle
+        # np.product() returns 1 for an empty array, so the result is just m(i), as it should
 
 def maxproduct(upstream_entries):
 '''
@@ -88,24 +121,22 @@ def maxproduct(upstream_entries):
         # get the product of these maxes
         upstream_entries_max_product = np.product(upstream_entries_max) # max(Mx1(x1)) * max(Mx2(x2)) * max(Mx3(x3))
         
-        # compute the message for the downstream variable evaluated at upstream_entries_max_argmax_sum (which is just the maxsum computed above, since the lambda function evaluates to 1)
-        upstream_entries_max_argmax_sum = upstream_entries_argmax.sum(upstream_entries_argmax)%2
-        node_function[upstream_entries_max_argmax_sum] = upstream_entries_max_product
+        # compute the message for the downstream variable evaluated at upstream_entries_max_argmax_sum
+        upstream_entries_max_argmax_sum = upstream_entries_argmax.sum(upstream_entries_argmax)%2  # a4=a1+a2+a3 mod 2
+        node_function[upstream_entries_max_argmax_sum] = upstream_entries_max_product # m(a4) = max(Mx1(x1)) * max(Mx2(x2)) * max(Mx3(x3))
         
-        # for the max of the downstream var evaluated at (1 - upstream_entries_max_argmax_sum), the sum of the downstream vars must be (1 - upstream_entries_max_argmax_sum)
+        
+        # STEP 2
         
         # indices of dowstream variable permutations whose sum (mod 2) adds up to (1 - upstream_entries_max_argmax_sum)
-        desired_indices_arrays = equi_count_generator(1 - upstream_entries_max_argmax_sum)
+        desired_indices_arrays = equi_count_generator(1 - upstream_entries_max_argmax_sum) # 4 permutations of (x1, x2, x3)
         
-        # convert this array to tuple
-        #desired_indices_tuple = tuple(map(tuple,desired_indices_tuple))
-        
-        # for each valid permutation of the downstream vars, multiply the messages
+        # for each valid permutation of the downstream vars, multiply the messages (Mx1(x1)*Mx2(x2)*M(x3) for each permutation)
         products=numpy.zeros(len(desired_indices_arrays))
         for idx, desired_indices_array in enumerate(desired_indices_arrays):
           products[idx] = np.product(upstream_entries[desired_indices_array])
         
-        # find the max message
+        # find the max message (m(1-a4) is the max of these 4 results)
         node_function[1 - upstream_entries_max_argmax_sum] = np.amax(products, 1)
     
 

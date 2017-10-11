@@ -3,9 +3,14 @@ from scipy.stats import norm
 import math
 
 debug = 0
+hamming_decode=0
 
-
+# parity matrix
 H = np.array([[1,0,1,0,1,0,1],[0,1,1,0,0,1,1],[0,0,0,1,1,1,1]])
+
+# decoding matrix
+R = np.array([[0,0,1,0,0,0,0],[0,0,0,0,1,0,0],[0,0,0,0,0,1,0],[0,0,0,0,0,0,1]])
+
 num_iterations = 20
 
 def decode(z, std_deviation):
@@ -61,6 +66,7 @@ def decode(z, std_deviation):
                 upstream_entries = V[row_idx, upstream_entries_col_indices] # extract the entries from V -- 3x2 matrix
 
                 # TODO: verify code via simulation
+                # TODO: add hamming decoder (trivial)
                 # TODO: sum product (note that only the maxproduct line below changes)
 
                 # compute the message passed from this function node to the downstream variable -- ie the max product of the upstream variables and the current node's function
@@ -92,7 +98,7 @@ def decode(z, std_deviation):
                 else:
                     V[row_idx, col_idx] = np.sum(upstream_entries, 0) + m[col_idx]
 
-                # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle
+                # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle:
                 # np.sum() returns 0 for an empty array, yet the result is m(i), hence the if statement above
 
         
@@ -133,7 +139,10 @@ def decode(z, std_deviation):
           
           x[col_idx] = np.argmax(summary_msg)
 
-    return x
+    if hamming_decode == 1:
+        return hamming_decode(x)
+    else:
+        return x
 
 def maxproduct(upstream_entries):
     '''
@@ -211,3 +220,14 @@ def equi_count_generator(desired_parity):
     equi_count_arrays=((equi_count_int[:, None] & (1 << np.arange(3))) > 0)*1
     
     return equi_count_arrays
+
+
+def hamming_decode(x):
+	'''
+		m is a 4 entry array (the recovered message): (m1, m2, m3, m4)
+		x is a 7 entry array of mostly likely encoded message: (x1, x2, x3, x4, x5, x6, x7)
+	'''
+
+	# multiplyx decoding matrix R with x and take modulo 2
+	m = np.remainder(R.dot(x), 2)
+	return m

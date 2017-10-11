@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 
-H = np.array([[0,0,0,1,1,1,1],[0,1,1,0,0,1,1],[1,0,1,0,1,0,1]])
+H = np.array([[1,0,1,0,1,0,1],[0,1,1,0,0,1,1],[0,0,0,1,1,1,1]])
 num_iterations = 20
 
 def decode(z, std_deviation):
@@ -27,11 +27,11 @@ def decode(z, std_deviation):
     for idx, zi in enumerate(z):
 
         # x(i) = 0 is transmitted as -1 so gaussian curve has mean -1
-        m[idx, 0] = norm.pdf(zi, -1, std_deviation)
+        m[idx, 0] = norm.pdf(zi, 1, std_deviation)
 
         # x(i) = 0 is transmitted as 1 so gaussian curve has mean 1
-        m[idx, 1] = norm.pdf(zi, 1, std_deviation)
-
+        m[idx, 1] = norm.pdf(zi, -1, std_deviation)
+    
     for iteration in range(0, num_iterations):
 
         # fill up F
@@ -88,6 +88,25 @@ def decode(z, std_deviation):
 
                 # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle
                 # np.product() returns 1 for an empty array, so the result is just m(i), as it should
+
+        
+        np.set_printoptions(precision=4)
+        print("AFTER ITERATION " + str(iteration + 1))
+        print("all m")
+        print(m)
+        print("all H")
+        print(H)
+        print("F for all x=0")
+        print(F[:,:,0])
+        print("F for all x=1")
+        print(F[:,:,1])
+        print("V for all x=0")
+        print(V[:,:,0])
+        print("V for all x=1")
+        print(V[:,:,1])
+        
+        if iteration == 10:
+            return 1
 
 
     # find max likelihood for xi

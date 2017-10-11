@@ -1,5 +1,9 @@
 import numpy as np
 from scipy.stats import norm
+import math
+
+debug = 0
+
 
 H = np.array([[1,0,1,0,1,0,1],[0,1,1,0,0,1,1],[0,0,0,1,1,1,1]])
 num_iterations = 20
@@ -12,12 +16,12 @@ def decode(z, std_deviation):
     '''
 
     # variable to function node matrix (initialized to its content before the first iteration)
-    V = np.ones((H.shape + (2,)))
+    V = np.zeros((H.shape + (2,)))
 
     # function to variable node matrix (initialized to its content after the first iteration -- first iteration will be recomputed anyway)
-    F = np.ones((H.shape + (2,)))
+    F = np.zeros((H.shape + (2,)))
 
-    # V and F have been set to their initial values (all ones) -- note that where H is zero, it will be set (and reset) to zero at every iteration.
+    # V and F have been set to their initial log values (all zeros) -- note that where H is zero, the entries will be ignored anyway.
 
 
     # compute the static node messages (not in cycles), ie the Pzi|xi -> xi nodes
@@ -27,10 +31,10 @@ def decode(z, std_deviation):
     for idx, zi in enumerate(z):
 
         # x(i) = 0 is transmitted as -1 so gaussian curve has mean -1
-        m[idx, 0] = norm.pdf(zi, 1, std_deviation)
+        m[idx, 0] = math.log(norm.pdf(zi, 1, std_deviation))
 
         # x(i) = 0 is transmitted as 1 so gaussian curve has mean 1
-        m[idx, 1] = norm.pdf(zi, -1, std_deviation)
+        m[idx, 1] = math.log(norm.pdf(zi, -1, std_deviation))
     
     for iteration in range(0, num_iterations):
 
@@ -41,12 +45,13 @@ def decode(z, std_deviation):
 
                 # if H entry is zero, these two nodes are not connected      
                 if entry == 0:
-                    F[row_idx, col_idx] = [0, 0]
                     continue
 
                 # multiply the incoming messages together (ie the messages in the variable matrix from the upstream variables, so excluding the downstream variable)
                 # to do so select all column indices of V except the column index of the current var under consideration
                 # if there is no connection between the two nodes currently considered, output zero hence use of H matrix
+                
+                # note that multiplication in log domain is addition, so we sum wherever multiplication is required
 
                 # get only the relevant entries of V, representing the upstream variables coming into the current node function
                 # (ie the current row, less all the zero entries of H, less the current column index)
@@ -55,9 +60,8 @@ def decode(z, std_deviation):
                 upstream_entries_col_indices = np.where(upstream_entries_col_indices_bool)[0] # find the indices of the "True" values
                 upstream_entries = V[row_idx, upstream_entries_col_indices] # extract the entries from V -- 3x2 matrix
 
-                # TODO: debug(!!!)
+                # TODO: verify code via simulation
                 # TODO: sum product (note that only the maxproduct line below changes)
-                # TODO: deal with underflow/overflow (?)
 
                 # compute the message passed from this function node to the downstream variable -- ie the max product of the upstream variables and the current node's function
                 F[row_idx, col_idx] = maxproduct(upstream_entries)  
@@ -69,7 +73,6 @@ def decode(z, std_deviation):
 
                 # if H entry is zero, these two nodes are not connected      
                 if entry == 0:
-                    V[row_idx, col_idx] = [0, 0]
                     continue
 
                 # multiply the incoming messages together (ie the messages in the variable matrix from the upstream functions, so excluding the downstream function)
@@ -84,29 +87,33 @@ def decode(z, std_deviation):
                 upstream_entries = F[upstream_entries_row_indices, col_idx] # extract the entries from F -- cx2 matrix, where c is number of upstream function nodes
 
                 # compute the message passed from this variable node to the downstream function -- ie the max product of the upstream variables and the current node's function                
-                V[row_idx, col_idx] = np.product(upstream_entries, 0) * m[col_idx]
+                if len(np.sum(upstream_entries, 0)) == 0:
+                    V[row_idx, col_idx] = m[col_idx]
+                else:
+                    V[row_idx, col_idx] = np.sum(upstream_entries, 0) + m[col_idx]
 
                 # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle
-                # np.product() returns 1 for an empty array, so the result is just m(i), as it should
+                # np.sum() returns 0 for an empty array, yet the result is m(i), hence the if statement above
 
         
-        np.set_printoptions(precision=4)
-        print("AFTER ITERATION " + str(iteration + 1))
-        print("all m")
-        print(m)
-        print("all H")
-        print(H)
-        print("F for all x=0")
-        print(F[:,:,0])
-        print("F for all x=1")
-        print(F[:,:,1])
-        print("V for all x=0")
-        print(V[:,:,0])
-        print("V for all x=1")
-        print(V[:,:,1])
-        
-        if iteration == 10:
-            return 1
+        if debug == 1:
+            #np.set_printoptions(precision=4)
+            print("AFTER ITERATION " + str(iteration + 1))
+            print("all m")
+            print(m)
+            print("all H")
+            print(H)
+            print("F for all x=0")
+            print(F[:,:,0])
+            print("F for all x=1")
+            print(F[:,:,1])
+            print("V for all x=0")
+            print(V[:,:,0])
+            print("V for all x=1")
+            print(V[:,:,1])
+
+            if iteration == 1:
+                return 1
 
 
     # find max likelihood for xi
@@ -121,8 +128,8 @@ def decode(z, std_deviation):
           msg_entries_row_indices = np.where(upstream_entries_row_indices_bool)[0] # find the indices of the "True" values
           msg_entries = F[msg_entries_row_indices, col_idx] # extract the entries from F -- cx2 matrix, where c is number of connected function nodes 
 
-          # compute the summary message at this variable -- ie the max product of the upstream variables and the current node's function
-          summary_msg = np.product(msg_entries, 0) * m[col_idx]
+          # compute the summary message at this variable -- ie the max product of the upstream variables and function nodes
+          summary_msg = np.sum(msg_entries, 0) + m[col_idx]
           
           x[col_idx] = np.argmax(summary_msg)
 
@@ -151,6 +158,9 @@ def maxproduct(upstream_entries):
             For x4=(1-a4), we must have that x1 + x2 + x3 = 1 - a4 mod 2 in order to obtain f(x1, x2, x3, x4) = 1.
             There are 4 permutations of (x1, x2, x3) that satisfy this equation.
             To find the max of m(1-a4), we find Mx1(x1)*Mx2(x2)*M(x3) for each permutation then take the max of these 4 results
+            
+            # note1: since we are in the log domain, we sum wherever multiplication is required
+            # note2: since log is a monotonic increasing function, max(loga, logb) = log(max(a,b)), so we still max in log domain
 
     '''
     
@@ -163,7 +173,7 @@ def maxproduct(upstream_entries):
     upstream_entries_argmax = np.argmax(upstream_entries, 1) # a1, a2, a3 in description example
        
     # get the product of these maxes
-    upstream_entries_max_product = np.product(upstream_entries_max) # max(Mx1(x1)) * max(Mx2(x2)) * max(Mx3(x3))
+    upstream_entries_max_product = np.sum(upstream_entries_max) # max(Mx1(x1)) * max(Mx2(x2)) * max(Mx3(x3))
     
     # compute the message for the downstream variable evaluated at upstream_entries_max_argmax_sum
     upstream_entries_max_argmax_sum = np.sum(upstream_entries_argmax)%2  # a4=a1+a2+a3 mod 2
@@ -178,7 +188,7 @@ def maxproduct(upstream_entries):
     # for each valid permutation of the downstream vars, multiply the messages (Mx1(x1)*Mx2(x2)*M(x3) for each permutation)
     products=np.zeros(len(desired_indices_arrays))
     for idx, desired_indices_array in enumerate(desired_indices_arrays):
-        products[idx] = np.product(upstream_entries[:, desired_indices_array])
+        products[idx] = np.sum(upstream_entries[:, desired_indices_array])
     
     # find the max message (m(1-a4) is the max of these 4 results)
     node_msg[1 - upstream_entries_max_argmax_sum] = np.amax(products)

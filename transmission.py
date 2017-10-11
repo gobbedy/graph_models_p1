@@ -42,5 +42,16 @@ def noise(y, std_deviation):
 	z = np.zeros(len(y))
 	for i in range(0, len(y)):
 		z[i] = y[i] + np.random.normal(0, std_deviation)
+	return z
 
+
+def transmitter(m, std_deviation):
+	'''
+		m is a 4 item array (the inital message): (m1, m2, m3, m4)
+		z is a 7 item array with added noise from gaussian distr: (z1, z2, z3, z4, z5, z6, z7)
+	'''
+
+	x = hamming(m)
+	y = inversion(x)
+	z = noise(y, std_deviation)
 	return z

@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import norm
+from scipy import misc
 import math
 
 debug = 0
@@ -13,10 +14,11 @@ R = np.array([[0,0,1,0,0,0,0],[0,0,0,0,1,0,0],[0,0,0,0,0,1,0],[0,0,0,0,0,0,1]])
 
 num_iterations = 20
 
-def decode(z, std_deviation):
+def decode(z, std_deviation, use_maxproduct=1):
     '''
       z is a 7 item array: (z1, z2, z3, z4, z5, z6, z7). These are described in the project 1 setup
       std_deviation is the known standard deviation of the channel Ni, also described in the setup (setup mentions variance, which is just the square of the std deviation)
+      use_maxproduct is the algorithm used for decoding. 1 for max product, 0 for sum product
       decode returns x, also a 7 value array: (x1, x2, x3, x4, x5, x6, x7)
     '''
 
@@ -65,12 +67,15 @@ def decode(z, std_deviation):
                 upstream_entries_col_indices = np.where(upstream_entries_col_indices_bool)[0] # find the indices of the "True" values
                 upstream_entries = V[row_idx, upstream_entries_col_indices] # extract the entries from V -- 3x2 matrix
 
+                # TODO: debug sum product -- try mao's algorithm
                 # TODO: verify code via simulation
-                # TODO: add hamming decoder (trivial)
                 # TODO: sum product (note that only the maxproduct line below changes)
 
                 # compute the message passed from this function node to the downstream variable -- ie the max product of the upstream variables and the current node's function
-                F[row_idx, col_idx] = maxproduct(upstream_entries)  
+                if use_maxproduct:
+                    F[row_idx, col_idx] = maxproduct(upstream_entries)
+                else:
+                    F[row_idx, col_idx] = sumproduct(upstream_entries)
 
         # fill up V
         for col_idx, col in enumerate(H.T):
@@ -144,6 +149,46 @@ def decode(z, std_deviation):
     else:
         return x
 
+def sumproduct(upstream_entries):
+    '''
+            Input: upstream_entries
+               3 x 2 matrix contain the incoming message from every upstream variable node (each row is a message function Mxi(xi) where xi are the upstream nodes)
+            
+            Ouput: node_msg
+               outgoing message to downstream variable (2 entry array representing a function Mxj(xj) where xj is a downstream node)
+            
+            
+            For any particular function node, there are 3 upstream variables, xi, each passing in a message Mxi(xi), and one downstream variable, xj
+            For the sake of this example we let the xi be x1, x2, x3, and the xj be x4 -- without loss of generality as the reasoning applies to any xi, xj in a cycle
+            We compute Mx1(x1)*Mx2(x2)*M(x3)*f(x1,x2,x3,x4) summed over (x1,x2,x3) -- we call this m(x4) (message to x4)
+
+            STEP 1
+            For x4=0, if x1 + x2 + x3 = 1, f(x1,x2,x3,x4) = 0, so all such permutations do not contribute to the sum
+            if x1 + x2 + x3 = 0, f(x1,x2,x3,x4) = 1, so we find Mx1(x1)*Mx2(x2)*M(x3) summed over those permutations of x1, x2, x3
+
+            Step 2
+            For x4=1 we use the same procedure as STEP 1 except that we use the permutations where x1 + x2 + x3 = 1
+            
+            # note1: since we are in the log domain, we sum wherever multiplication is required
+            # note2: since we are in the log domain, we use logsum where ever a sum is required
+
+    '''
+    
+    node_msg = np.zeros(2)
+    
+    for downstream_var_value in range(0,2):
+        # indices of dowstream variable permutations whose sum (mod 2) adds up to (1 - upstream_entries_max_argmax_sum)
+        desired_indices_arrays = equi_count_generator(downstream_var_value) # 4 permutations of (x1, x2, x3)
+
+        # for each valid permutation of the downstream vars, multiply the messages (Mx1(x1)*Mx2(x2)*M(x3) for each permutation)
+        products=np.zeros(len(desired_indices_arrays))
+        for idx, desired_indices_array in enumerate(desired_indices_arrays):
+            products[idx] = np.sum(upstream_entries[:, desired_indices_array])
+        
+        # find the sum of the permutations
+        node_msg[downstream_var_value] = misc.logsumexp(products)
+
+
 def maxproduct(upstream_entries):
     '''
             Input: upstream_entries
@@ -160,7 +205,7 @@ def maxproduct(upstream_entries):
             STEP 1 -- find the max of each individual upstream variable message (optimization to reduce computation)
             We know that max(Mx1(x1)) * max(Mx2(x2)) * max(Mx3(x3)) exists for some x1=a1, x2=a2, x3=a3.
             And regardless of a1, a2, a3, there exists an x4=a4 such that a1 + a2 + a3 + a4 = 0 mod 2, ie such that f(x1,x2,x3,x4)=1
-            Its obvious that the a4 that satisfies this requirement is a4=a1+a2+a3 mod 2
+            Its obvious that the a4 that satisfies the equation a4=a1+a2+a3 mod 2
             Therefore since f(x1,x2,x3,x4) cannot be higher than 1, we know that m(a4) = max(Mx1(x1)) * max(Mx2(x2)) * max(Mx3(x3))
 
             Step 2
@@ -173,7 +218,7 @@ def maxproduct(upstream_entries):
 
     '''
     
-    node_msg = np.zeros(2)
+    node_msg = np.zeros(2)        
     
     # STEP 1
     
@@ -207,7 +252,8 @@ def maxproduct(upstream_entries):
 def equi_count_generator(desired_parity):
     '''
        desired_parity is an integer with value either 0 or 1
-       returns an array of all arrays of size 3 with bitcount%2 equal to desired_parity -- [0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]
+       returns an array of all arrays of size 3 with bitcount%2 equal to desired_parity
+       if desired_parity is 0, returns an array of all arrays of size 3 with bitcount%2 equal to 0 -- [0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]
        if desired_parity is 1, returns an array of all arrays of size 3 with bitcount%2 equal to 1 -- [0, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1]
        equi_count_arrays is the returned array described above
 

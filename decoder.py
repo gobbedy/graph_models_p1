@@ -4,8 +4,16 @@ from scipy.stats import norm
 from scipy import misc
 import math
 
-debug = 0
-hamming_decode=0
+
+class Decoder:
+
+    def __init__(self, num_iterations, H, R, std_deviation, use_max_product=1, use_hamming_decode=0):
+        self.num_iterations = num_iterations
+        self.H  = H # parity matrix
+        self.R = R # decoding matrix
+        self.std_deviation = std_deviation # std_deviation is the known standard deviation of the channel Ni, also described in the setup (setup mentions variance, which is just the square of the std deviation)
+        self.use_max_product = use_max_product # use_maxproduct is the algorithm used for decoding. 1 for max product, 0 for sum product
+        self.use_hamming_decode = use_hamming_decode # if 1, output of decode is original message (m1, m2, m3, 4). if 0, hamming decode not used so output is just (x1, x2, x3, x4, x5, x6, x7)
 
 # parity matrix
 H = np.array([[1,0,1,0,1,0,1],[0,1,1,0,0,1,1],[0,0,0,1,1,1,1]])
@@ -13,21 +21,17 @@ H = np.array([[1,0,1,0,1,0,1],[0,1,1,0,0,1,1],[0,0,0,1,1,1,1]])
 # decoding matrix
 R = np.array([[0,0,1,0,0,0,0],[0,0,0,0,1,0,0],[0,0,0,0,0,1,0],[0,0,0,0,0,0,1]])
 
-num_iterations = 20
-
-def decode(z, std_deviation, use_maxproduct=1):
+def decode(z):
     '''
       z is a 7 item array: (z1, z2, z3, z4, z5, z6, z7). These are described in the project 1 setup
-      std_deviation is the known standard deviation of the channel Ni, also described in the setup (setup mentions variance, which is just the square of the std deviation)
-      use_maxproduct is the algorithm used for decoding. 1 for max product, 0 for sum product
       decode returns x, also a 7 value array: (x1, x2, x3, x4, x5, x6, x7)
     '''
 
     # variable to function node matrix (initialized to its content before the first iteration)
-    V = np.zeros((H.shape + (2,)))
+    V = np.zeros((self.H.shape + (2,)))
 
     # function to variable node matrix (initialized to its content after the first iteration -- first iteration will be recomputed anyway)
-    F = np.zeros((H.shape + (2,)))
+    F = np.zeros((self.H.shape + (2,)))
 
     # V and F have been set to their initial log values (all zeros) -- note that where H is zero, the entries will be ignored anyway.
 
@@ -39,15 +43,15 @@ def decode(z, std_deviation, use_maxproduct=1):
     for idx, zi in enumerate(z):
 
         # x(i) = 0 is transmitted as -1 so gaussian curve has mean -1
-        m[idx, 0] = math.log(norm.pdf(zi, 1, std_deviation))
+        m[idx, 0] = math.log(norm.pdf(zi, 1, self.std_deviation))
 
         # x(i) = 0 is transmitted as 1 so gaussian curve has mean 1
-        m[idx, 1] = math.log(norm.pdf(zi, -1, std_deviation))
+        m[idx, 1] = math.log(norm.pdf(zi, -1, self.std_deviation))
     
-    for iteration in range(0, num_iterations):
+    for iteration in range(0, self.num_iterations):
 
         # fill up F
-        for row_idx, row in enumerate(H):
+        for row_idx, row in enumerate(self.H):
 
             for col_idx, entry in enumerate(row):
 
@@ -67,30 +71,19 @@ def decode(z, std_deviation, use_maxproduct=1):
                 upstream_entries_col_indices_bool[col_idx] = False # also remove the current column (down to 3 entries)
                 upstream_entries_col_indices = np.where(upstream_entries_col_indices_bool)[0] # find the indices of the "True" values
                 upstream_entries = V[row_idx, upstream_entries_col_indices] # extract the entries from V -- 3x2 matrix
-                
-                #if np.isnan(upstream_entries).any():
-                #    print("bad entries")
-                #    exit()
-                #print("a")
-                #print(upstream_entries)
-                #print("b")
 
                 # TODO: debug sum product -- try mao's algorithm
                 # TODO: verify code via simulation
                 # TODO: sum product (note that only the maxproduct line below changes)
 
                 # compute the message passed from this function node to the downstream variable -- ie the max product of the upstream variables and the current node's function
-                if use_maxproduct:
+                if self.use_max_product:
                     F[row_idx, col_idx] = maxproduct(upstream_entries)
                 else:
                     F[row_idx, col_idx] = sumproduct(upstream_entries)
 
         # fill up V
-        #print("F after iteration: " + str(iteration))
-        #print(F[:,:,:])
-        #print("end F")
-        #exit()
-        for col_idx, col in enumerate(H.T):
+        for col_idx, col in enumerate(self.H.T):
 
             for row_idx, entry in enumerate(col):
 
@@ -112,44 +105,16 @@ def decode(z, std_deviation, use_maxproduct=1):
                 # compute the message passed from this variable node to the downstream function -- ie the max product of the upstream variables and the current node's function                
                 if len(np.sum(upstream_entries, 0)) == 0:
                     V[row_idx, col_idx] = m[col_idx]
-                    #print("x")
                 else:
-                    #if np.isnan(np.sum(upstream_entries, 0)).any():
-                    #    print("V nan error")
-                    #    exit()
                     V[row_idx, col_idx] = np.sum(upstream_entries, 0) + m[col_idx]
 
                 # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle:
                 # np.sum() returns 0 for an empty array, yet the result is m(i), hence the if statement above
 
-        #print("V after iteration: " + str(iteration))
-        #print(V[:,:,:])
-        #print("end V")
-
-        
-        if debug == 1:
-            #np.set_printoptions(precision=4)
-            print("AFTER ITERATION " + str(iteration + 1))
-            print("all m")
-            print(m)
-            print("all H")
-            print(H)
-            print("F for all x=0")
-            print(F[:,:,0])
-            print("F for all x=1")
-            print(F[:,:,1])
-            print("V for all x=0")
-            print(V[:,:,0])
-            print("V for all x=1")
-            print(V[:,:,1])
-
-            if iteration == 1:
-                return 1
-
 
     # find max likelihood for xi
     x = np.zeros(z.shape)
-    for col_idx, col in enumerate(H.T):
+    for col_idx, col in enumerate(self.H.T):
 
           # multiply the messages together (ie the messages in the variable matrix from all the connected functions)
 
@@ -164,7 +129,7 @@ def decode(z, std_deviation, use_maxproduct=1):
           
           x[col_idx] = np.argmax(summary_msg)
 
-    if hamming_decode == 1:
+    if self.use_hamming_decode == 1:
         return hamming_decode(x)
     else:
         return x
@@ -202,23 +167,13 @@ def sumproduct(upstream_entries):
 
         # for each valid permutation of the downstream vars, multiply the messages (Mx1(x1)*Mx2(x2)*M(x3) for each permutation)
         products=np.zeros(len(desired_indices_arrays))
-        for idx, desired_indices_array in enumerate(desired_indices_arrays):
-            #total_sum=0
-            #print(upstream_entries)
-            #print(desired_indices_array)
-            #print(upstream_entries[range(0,len(upstream_entries)), desired_indices_array])
-            #for ele in upstream_entries[range(0,len(upstream_entries)), desired_indices_array]:
-            #    if math.isnan(ele):
-            #        print("not a number, error")
-            #        exit()
-            #    total_sum = logsum(total_sum, ele)            
+        for idx, desired_indices_array in enumerate(desired_indices_arrays):         
             products[idx] = np.sum(upstream_entries[range(0,len(upstream_entries)), desired_indices_array])
 
             # np_logsum = np.frompyfunc(logsum)
             # products[idx] = np_logsum.reduce(upstream_entries[:, desired_indices_array])
         
         # find the sum of the permutations
-        #print(misc.logsumexp(products))
         node_msg[downstream_var_value] = misc.logsumexp(products)
 
     return node_msg
@@ -310,20 +265,5 @@ def hamming_decode(x):
     '''
 
     # multiplyx decoding matrix R with x and take modulo 2
-    m = np.remainder(R.dot(x), 2)
+    m = np.remainder(self.R.dot(x), 2)
     return m
-
-def logsum(x,y):
-    diff=x-y
-    if diff>23:
-        return x
-    elif diff <-23:
-        return y
-    else:
-        return (y + math.log(math.exp(diff)+1))
-    
-
-
-z = np.array([-1.5, -1.5, -1.5,  1.5,  1.5,  1.5,  1.5]).reshape((7,1))
-x = decode(z, 1, 0)
-print(x)

@@ -28,7 +28,8 @@ class Simulator:
         x = np.array([0, 0, 0, 0, 0, 0, 0]).T
         
         # list of variances over which to compute bit error rate (1, 1/2, 1/4, 1/8
-        variances = 1/np.power(2, np.arange(1,5)-1)
+        #variances = 1/np.power(2, np.arange(1,5)-1)
+        variances = np.arange(1,11)/10
         variance_bit_error_rate_table = np.zeros((2,len(variances))) # 2x4 matrix: first row is variances, second row is bit error rate
         variance_bit_error_rate_table[0] = variances
 
@@ -53,22 +54,28 @@ class Simulator:
 
     def simulate(self):
     
+        # TODO: show more increments on axes, better title
+    
         # get bit error rates for max product
-        variance_bit_error_rate_table_log = np.log10(self.get_bit_error_rates(1))
+        variance_bit_error_rate_table_log = self.get_bit_error_rates(1)
         plt.figure()
-        plt.xlabel('log10(variance)')
-        plt.ylabel('log10(probability of bit error)')
+        plt.xlabel('variance')
+        plt.ylabel('probability of bit error')
         plt.title('Max product performance graph')
-        plt.plot(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'bx')
+        print("Max product variance vs probability error:")
+        print(variance_bit_error_rate_table_log)
+        plt.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'bx')
         
         
         # get bit error rates for sum product
-        variance_bit_error_rate_table_log = np.log10(self.get_bit_error_rates(1))
+        variance_bit_error_rate_table_log = self.get_bit_error_rates(1)
         plt.figure()
         plt.xlabel('log10(variance)')
         plt.ylabel('log10(probability of bit error)')
         plt.title('Sum product performance graph')
-        plt.plot(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'rx')
+        print("Sum product variance vs probability error:")
+        print(variance_bit_error_rate_table_log)
+        plt.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'rx')
         
         plt.show(block=False)
 

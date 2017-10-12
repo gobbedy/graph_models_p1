@@ -1,3 +1,4 @@
+#!/usr/bin/python3.4
 import numpy as np
 from scipy.stats import norm
 from scipy import misc
@@ -66,6 +67,13 @@ def decode(z, std_deviation, use_maxproduct=1):
                 upstream_entries_col_indices_bool[col_idx] = False # also remove the current column (down to 3 entries)
                 upstream_entries_col_indices = np.where(upstream_entries_col_indices_bool)[0] # find the indices of the "True" values
                 upstream_entries = V[row_idx, upstream_entries_col_indices] # extract the entries from V -- 3x2 matrix
+                
+                #if np.isnan(upstream_entries).any():
+                #    print("bad entries")
+                #    exit()
+                #print("a")
+                #print(upstream_entries)
+                #print("b")
 
                 # TODO: debug sum product -- try mao's algorithm
                 # TODO: verify code via simulation
@@ -78,6 +86,10 @@ def decode(z, std_deviation, use_maxproduct=1):
                     F[row_idx, col_idx] = sumproduct(upstream_entries)
 
         # fill up V
+        #print("F after iteration: " + str(iteration))
+        #print(F[:,:,:])
+        #print("end F")
+        #exit()
         for col_idx, col in enumerate(H.T):
 
             for row_idx, entry in enumerate(col):
@@ -100,11 +112,19 @@ def decode(z, std_deviation, use_maxproduct=1):
                 # compute the message passed from this variable node to the downstream function -- ie the max product of the upstream variables and the current node's function                
                 if len(np.sum(upstream_entries, 0)) == 0:
                     V[row_idx, col_idx] = m[col_idx]
+                    #print("x")
                 else:
+                    #if np.isnan(np.sum(upstream_entries, 0)).any():
+                    #    print("V nan error")
+                    #    exit()
                     V[row_idx, col_idx] = np.sum(upstream_entries, 0) + m[col_idx]
 
                 # Note: what happens when upstream_entries is empty? which happens when variable node not in a cycle:
                 # np.sum() returns 0 for an empty array, yet the result is m(i), hence the if statement above
+
+        #print("V after iteration: " + str(iteration))
+        #print(V[:,:,:])
+        #print("end V")
 
         
         if debug == 1:
@@ -183,10 +203,25 @@ def sumproduct(upstream_entries):
         # for each valid permutation of the downstream vars, multiply the messages (Mx1(x1)*Mx2(x2)*M(x3) for each permutation)
         products=np.zeros(len(desired_indices_arrays))
         for idx, desired_indices_array in enumerate(desired_indices_arrays):
-            products[idx] = np.sum(upstream_entries[:, desired_indices_array])
+            #total_sum=0
+            #print(upstream_entries)
+            #print(desired_indices_array)
+            #print(upstream_entries[range(0,len(upstream_entries)), desired_indices_array])
+            #for ele in upstream_entries[range(0,len(upstream_entries)), desired_indices_array]:
+            #    if math.isnan(ele):
+            #        print("not a number, error")
+            #        exit()
+            #    total_sum = logsum(total_sum, ele)            
+            products[idx] = np.sum(upstream_entries[range(0,len(upstream_entries)), desired_indices_array])
+
+            # np_logsum = np.frompyfunc(logsum)
+            # products[idx] = np_logsum.reduce(upstream_entries[:, desired_indices_array])
         
         # find the sum of the permutations
+        #print(misc.logsumexp(products))
         node_msg[downstream_var_value] = misc.logsumexp(products)
+
+    return node_msg
 
 
 def maxproduct(upstream_entries):
@@ -269,11 +304,26 @@ def equi_count_generator(desired_parity):
 
 
 def hamming_decode(x):
-	'''
-		m is a 4 entry array (the recovered message): (m1, m2, m3, m4)
-		x is a 7 entry array of mostly likely encoded message: (x1, x2, x3, x4, x5, x6, x7)
-	'''
+    '''
+	    m is a 4 entry array (the recovered message): (m1, m2, m3, m4)
+	    x is a 7 entry array of mostly likely encoded message: (x1, x2, x3, x4, x5, x6, x7)
+    '''
 
-	# multiplyx decoding matrix R with x and take modulo 2
-	m = np.remainder(R.dot(x), 2)
-	return m
+    # multiplyx decoding matrix R with x and take modulo 2
+    m = np.remainder(R.dot(x), 2)
+    return m
+
+def logsum(x,y):
+    diff=x-y
+    if diff>23:
+        return x
+    elif diff <-23:
+        return y
+    else:
+        return (y + math.log(math.exp(diff)+1))
+    
+
+
+z = np.array([-1.5, -1.5, -1.5,  1.5,  1.5,  1.5,  1.5]).reshape((7,1))
+x = decode(z, 1, 0)
+print(x)

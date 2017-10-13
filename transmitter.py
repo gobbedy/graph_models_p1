@@ -42,9 +42,8 @@ class Transmitter:
             '''
 
             # add noise from gaussian normal curve with defined standard deviation
-            z = np.zeros(len(y))
-            for i in range(0, len(y)):
-                z[i] = y[i] + np.random.normal(0, std_deviation)
+            noise = np.random.normal(0, std_deviation, y.shape)
+            z = y + noise
             return z
 
 

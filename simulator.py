@@ -2,7 +2,7 @@ import numpy as np
 import decoder
 import transmitter
 import math
-from matplotlib import pyplot as plt
+import pylab
 
 class Simulator:
 
@@ -23,9 +23,9 @@ class Simulator:
         
     
     def get_bit_error_rates(self, algorithm):
-    
+
         # set x to zero for simplicity
-        x = np.array([0, 0, 0, 0, 0, 0, 0]).T
+        x = np.zeros((7,1))
         
         # list of variances over which to compute bit error rate (1, 1/2, 1/4, 1/8
         #variances = 1/np.power(2, np.arange(1,5)-1)
@@ -54,30 +54,30 @@ class Simulator:
 
     def simulate(self):
     
-        # TODO: show more increments on axes, better title
+        # TODO: show more numbers on the axes, looks empty now
+        # maybe try one of these
+        # https://stackoverflow.com/questions/16830520/how-can-i-label-the-minor-tics-in-a-loglog-plot-in-matplotlib
+        # https://stackoverflow.com/questions/6567724/matplotlib-so-log-axis-only-has-minor-tick-mark-labels-at-specified-points-also
+
+        pylab.xlabel('Variance')
+        pylab.ylabel('Probability of Bit Error')
+        pylab.title('(7,4) Hamming + Gaussian Decoder Performance (Max Product vs Sum Product)')
     
         # get bit error rates for max product
         variance_bit_error_rate_table_log = self.get_bit_error_rates(1)
-        plt.figure()
-        plt.xlabel('variance')
-        plt.ylabel('probability of bit error')
-        plt.title('Max product performance graph')
         print("Max product variance vs probability error:")
         print(variance_bit_error_rate_table_log)
-        plt.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'bx')
+        pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'bx', label='Max Product')
         
         
         # get bit error rates for sum product
-        variance_bit_error_rate_table_log = self.get_bit_error_rates(1)
-        plt.figure()
-        plt.xlabel('log10(variance)')
-        plt.ylabel('log10(probability of bit error)')
-        plt.title('Sum product performance graph')
+        variance_bit_error_rate_table_log = self.get_bit_error_rates(0)
         print("Sum product variance vs probability error:")
         print(variance_bit_error_rate_table_log)
-        plt.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'rx')
-        
-        plt.show(block=False)
+        pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'rx', label='Sum Product')
+
+        pylab.legend(loc='lower right')        
+        pylab.show(block=False)
 
         var = input("Enter something to close plots and exit: ")
-        plt.close('all')
+        pylab.close('all')

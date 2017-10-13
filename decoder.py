@@ -225,7 +225,7 @@ class Decoder:
         # for each valid permutation of the downstream vars, multiply the messages (Mx1(x1)*Mx2(x2)*M(x3) for each permutation)
         products=np.zeros(len(desired_indices_arrays))
         for idx, desired_indices_array in enumerate(desired_indices_arrays):
-            products[idx] = np.sum(upstream_entries[:, desired_indices_array])
+            products[idx] = np.sum(upstream_entries[range(0,len(upstream_entries)), desired_indices_array])
 
         # find the max message (m(1-a4) is the max of these 4 results)
         node_msg[1 - upstream_entries_max_argmax_sum] = np.amax(products)

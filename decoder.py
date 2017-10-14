@@ -14,12 +14,31 @@ class Decoder:
 
     def decode(self, z, use_max_product, std_deviation):
         '''
-          z is a 7 item array: (z1, z2, z3, z4, z5, z6, z7). These are described in the project 1 setup
+          z is a 7 entry array: (z1, z2, z3, z4, z5, z6, z7). These are described in the project 1 setup
           use_maxproduct is the algorithm used for decoding. 1 for max product, 0 for sum product
           std_deviation is the known standard deviation of the channel Ni, also described in the setup (setup mentions variance, which is just the square of the std deviation)
           decode returns x, also a 7 value array: (x1, x2, x3, x4, x5, x6, x7)
+          
+          The graph's messages can be partitioned as follows:
+            1) The messages from the Pz|x function nodes to variable (Xi) nodes -- these are cycle free and therefore are statically described in an array which we arbitrarily call m
+            2) The messages from the variable (Xi) nodes to the function (fi) nodes, which may or may not be part of cycle (depending if they connect to 1 vs 2+ function nodes).
+               Each variable can potentially send a message to any function node, and these messages change at each iteration of a cycle.
+               We describe these messages in a sparse matrix V (for variable node) -- sparse because the entry for any unconnected Xi->fi node will be zero.
+            3) The messages from the function (fi) nodes to the variable (Xi) nodes, which are part of a cycle. We describe these messages using a matrix F.
+               Similarly to V (and for the same reasons), F is dynamic and sparse
+               
+           The returned value 'x' is the decoder's best guess for the original codeword sent by the transmitter. To compute x, we take the summary message (multiplication of all incoming
+           messages at the variable (xi) nodes), after a prescribed (20) number of iterations. 20 was chosen somewhat arbitrarily, as the decoder did not perform observably better than 5, so any higher
+           seemed an unreasonable speed hit to the algorithm.
+           
+           Finally, because underflow was observed (small fractions multiplied many times become too small to be carried in floating point numbers) we perform all computations in the log domain.
+           
+           In the log domain:
+             Multiplication in the linear domain becomes addition
+             Addition becomes logsumexp (numpy has an efficient function for this, so we didn't use the algorithm suggested in the assignment description)
+             Max remains max (since log(x) is monotically increasing)          
         '''
-
+        
         # variable to function node matrix (initialized to its content before the first iteration)
         V = np.zeros((self.H.shape + (2,)))
 
@@ -240,7 +259,7 @@ class Decoder:
            if desired_parity is 1, returns an array of all arrays of size 3 with bitcount%2 equal to 1 -- [0, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1]
            equi_count_arrays is the returned array described above
 
-           for generalizing with values above 8, can use ideas from http://p-nand-q.com/python/algorithms/math/bit-parity.html
+           for generalizing with array sizes greater than 3 (i values above 8 in the line below), can use ideas from http://p-nand-q.com/python/algorithms/math/bit-parity.html
         '''
         # all integers between 0 and 7 with bit parity equal to desired_parity
         equi_count_int = np.where(((0x6996 >> np.arange(8)) & 1) == desired_parity)[0]
@@ -257,6 +276,6 @@ class Decoder:
 	        x is a 7 entry array of mostly likely encoded message: (x1, x2, x3, x4, x5, x6, x7)
         '''
 
-        # multiplyx decoding matrix R with x and take modulo 2
+        # multiply decoding matrix R with x and take modulo 2
         m = np.remainder(self.R.dot(x), 2)
         return m

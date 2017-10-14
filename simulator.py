@@ -13,7 +13,7 @@ class Simulator:
         self.G = G # code generator matrix
         
         self.Transmitter = transmitter.Transmitter(G)
-        self.Decoder = decoder.Decoder(20, H, R)
+        self.Decoder = decoder.Decoder(10, H, R)
 
     def iteration(self, x, algorithm, std_deviation):
         
@@ -59,11 +59,6 @@ class Simulator:
 
 
     def simulate(self):
-    
-        # TODO: show more numbers on the axes, looks empty now
-        # maybe try one of these
-        # https://stackoverflow.com/questions/16830520/how-can-i-label-the-minor-tics-in-a-loglog-plot-in-matplotlib
-        # https://stackoverflow.com/questions/6567724/matplotlib-so-log-axis-only-has-minor-tick-mark-labels-at-specified-points-also
 
         # prepare plot with x/y labels and title
         pylab.xlabel('Variance')
@@ -74,14 +69,13 @@ class Simulator:
         variance_bit_error_rate_table_log = self.get_bit_error_rates(1)
         print("Max product variance vs probability error:")
         print(variance_bit_error_rate_table_log)
-        pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'bx', label='Max Product')
-        
+        pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], '--bx', label='Max Product')        
         
         # get bit error rates for sum product, and plot (on same figure)
         variance_bit_error_rate_table_log = self.get_bit_error_rates(0)
         print("Sum product variance vs probability error:")
         print(variance_bit_error_rate_table_log)
-        pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'rx', label='Sum Product')
+        pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], '--rx', label='Sum Product')
 
         # add legend on graph
         pylab.legend(loc='upper left')

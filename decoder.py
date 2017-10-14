@@ -28,7 +28,7 @@ class Decoder:
                Similarly to V (and for the same reasons), F is dynamic and sparse, and its non-zero entries may or may not belong to cycles.
                
            The returned value 'x' is the decoder's best guess for the original codeword sent by the transmitter. To compute x, we take the summary message (multiplication of all incoming
-           messages at the variable (xi) nodes), after a prescribed (20) number of iterations. 20 was chosen somewhat arbitrarily, as the decoder did not perform observably better than 5, so any higher
+           messages at the variable (xi) nodes), after a prescribed (10) number of iterations. 10 was chosen somewhat arbitrarily, as the decoder did not perform observably better than 5, so any higher
            seemed an unreasonable speed hit to the algorithm.
            
            Finally, because underflow was observed (small fractions multiplied many times become too small to be carried in floating point numbers) we take the log of all original messages,

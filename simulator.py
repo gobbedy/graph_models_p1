@@ -84,7 +84,7 @@ class Simulator:
         pylab.loglog(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[1], 'rx', label='Sum Product')
 
         # add legend on graph
-        pylab.legend(loc='lower right')
+        pylab.legend(loc='upper left')
         
         # set the x ticks manually, as the defaults are too sparse
         pylab.xticks(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[0])

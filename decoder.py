@@ -24,14 +24,15 @@ class Decoder:
             2) The messages from the variable (Xi) nodes to the function (fi) nodes, which may or may not be part of cycle (depending if they connect to 1 vs 2+ function nodes).
                Each variable can potentially send a message to any function node, and these messages change at each iteration of a cycle.
                We describe these messages in a sparse matrix V (for variable node) -- sparse because the entry for any unconnected Xi->fi node will be zero.
-            3) The messages from the function (fi) nodes to the variable (Xi) nodes, which are part of a cycle. We describe these messages using a matrix F.
-               Similarly to V (and for the same reasons), F is dynamic and sparse
+            3) The messages from the function (fi) nodes to the variable (Xi) nodes. We describe these messages using a matrix F.
+               Similarly to V (and for the same reasons), F is dynamic and sparse, and its non-zero entries may or may not belong to cycles.
                
            The returned value 'x' is the decoder's best guess for the original codeword sent by the transmitter. To compute x, we take the summary message (multiplication of all incoming
            messages at the variable (xi) nodes), after a prescribed (20) number of iterations. 20 was chosen somewhat arbitrarily, as the decoder did not perform observably better than 5, so any higher
            seemed an unreasonable speed hit to the algorithm.
            
-           Finally, because underflow was observed (small fractions multiplied many times become too small to be carried in floating point numbers) we perform all computations in the log domain.
+           Finally, because underflow was observed (small fractions multiplied many times become too small to be carried in floating point numbers) we take the log of all original messages,
+           and perform all computations in the log domain.
            
            In the log domain:
              Multiplication in the linear domain becomes addition

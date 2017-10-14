@@ -86,6 +86,9 @@ class Simulator:
         # add legend on graph
         pylab.legend(loc='lower right')
         
+        # set the x ticks manually, as the defaults are too sparse
+        pylab.xticks(variance_bit_error_rate_table_log[0], variance_bit_error_rate_table_log[0])
+        
         # now that's ready, render the plot. block=False allows code to continue instead of waiting for user to manually close graph        
         pylab.show(block=False)
 
